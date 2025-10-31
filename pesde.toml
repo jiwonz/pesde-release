@@ -1,0 +1,12 @@
+name = "jiwonz/pesde_release"
+version = "0.1.0"
+authors = ["jiwonz <me@jiwonz.kr>"]
+repository = "https://github.com/jiwonz/pesde-release"
+license = "MIT"
+
+[target]
+environment = "lune"
+bin = "src/main.luau"
+
+[indices]
+default = "https://github.com/pesde-pkg/index"

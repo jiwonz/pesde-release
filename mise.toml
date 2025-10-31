@@ -1,0 +1,6 @@
+[tools]
+"github:seaofvoices/darklua" = "latest"
+
+[tasks.bundle]
+description = "Bundle action code into dist"
+run = "darklua process src dist"
