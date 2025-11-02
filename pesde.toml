@@ -1,7 +1,7 @@
-name = "jiwonz/pesde_release"
+name = "jiwonz/release_pesde_action"
 version = "0.1.0"
 authors = ["jiwonz <me@jiwonz.kr>"]
-repository = "https://github.com/jiwonz/pesde-release"
+repository = "https://github.com/jiwonz/release-pesde-action"
 license = "MIT"
 
 [target]
