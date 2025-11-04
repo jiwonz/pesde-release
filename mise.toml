@@ -4,3 +4,15 @@
 [tasks.bundle]
 description = "Bundle action code into dist"
 run = "darklua process src/main.luau dist/main.luau"
+
+[tasks.check]
+description = "Lint the source code"
+run = [
+	"selene src",
+	"stylua --check src",
+	"luau-lsp analyze src"
+]
+
+[tasks.format]
+description = "Format the source code"
+run = "stylua src"

@@ -1,4 +1,5 @@
 {
-	"luau-lsp.platform.type": "standard",
-	"stylua.targetReleaseVersion": "latest"
+  "luau-lsp.platform.type": "roblox",
+  "stylua.targetReleaseVersion": "latest",
+  "luau-lsp.fflags.enableNewSolver": true
 }
