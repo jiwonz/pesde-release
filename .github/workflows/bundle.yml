@@ -1,0 +1,10 @@
+name: Bundle
+
+on: [push]
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Do nothing
+        run: echo "No operation yet, always succeed."
