@@ -1,17 +1,9 @@
 local pathfs = require("../lune_packages/pathfs")
-
-export type Options = {
-	keepachangelog: boolean?,
-	bundles: { string }?,
-	publishes: { string }?,
-	osTargets: { string }?,
-	osTargetGlobal: string?,
-	commitToken: string?,
-}
+local Manifest = require("./Manifest")
 
 local lib = {}
 
-function lib.release(options: Options, dryRun: boolean?)
+function lib.release(manifest: Manifest.Manifest, dryRun: boolean?)
 
 end
 
