@@ -1,1 +1,4 @@
-std = "luau+new_solver_selene"
+std = "luau"
+
+[lints]
+undefined_variable = "allow"
