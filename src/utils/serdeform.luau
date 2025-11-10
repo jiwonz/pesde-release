@@ -1,3 +1,4 @@
+local serde = require("@lune/serde")
 local convertCase = require("./convertCase")
 
 local serdeform = {}
@@ -5,9 +6,13 @@ local serdeform = {}
 type Check<T = any> = (value: T) -> (boolean, string?)
 
 type function FromForm(schema: type): type
-	assert(schema:is("table"), "schema must be a table type")
+	if schema.tag == "any" or schema.tag == "unknown" then
+		return types.any
+	end
+	assert(schema:is("table"), `schema must be a table type. got {schema.tag}`)
 	local props = {}
 	for prop, val in schema:properties() do
+		assert(prop:is("singleton"), "schema properties must be string singletons")
 		-- selene: allow(shadowing)
 		local val = val.read or val.write
 		if not val then
@@ -21,6 +26,38 @@ type function FromForm(schema: type): type
 	return types.newtable(props, nil, nil)
 end
 
+type function ValidSchema(schema: type): type
+	assert(schema:is("table"), `schema must be a table type. got {schema.tag}`)
+	for prop, val in schema:properties() do
+		assert(prop:is("singleton"), "schema properties must be string singletons")
+		-- selene: allow(shadowing)
+		local val = val.read or val.write
+		if not val then
+			continue
+		end
+		if val:is("function") then
+			local params = val:parameters().head
+			assert(params and params[1], "form property functions must have exactly one parameter")
+		elseif val:is("table") then
+			-- selene: allow(shadowing)
+			local schema = val:readproperty(types.singleton("schema"))
+			assert(schema, "Form property must have schema property")
+			ValidSchema(schema)
+		else
+			error("invalid schema property type: expected function(Check) or Form, got " .. val.tag)
+		end
+	end
+	return schema
+end
+
+type function Test(a: type, b: type): type
+	if a == b then
+		return a
+	else
+		error("Types are not equal")
+	end
+end
+
 -- TODO: Support strict schema checking (e.g. no extra properties allowed)
 local Form = {}
 local mt = {
@@ -29,12 +66,6 @@ local mt = {
 		return self:construct(data)
 	end
 }
-
-local function createForm<T>(schema: T): Form<T>
-	return setmetatable({
-		schema = schema,
-	}, mt)
-end
 
 local function isForm<T>(value: any): boolean
 	return type(value) == "table" and getmetatable(value) == mt
@@ -112,14 +143,11 @@ function Form.fromTable<T>(self: Form<T>, tbl: { [string]: any }): FromForm<T>
 	return result :: FromForm<T>
 end
 
-local encodeDecodeFormats = {
-	toml = true,
-	json = true,
-	yaml = true,
-	jsonc = true,
-}
+function Form.from<T>(self: Form<T>, format: serde.EncodeDecodeFormat, encoded: buffer | string): FromForm<T>
+	return self:fromTable(serde.decode(format, encoded))
+end
 
-type Form<T> = setmetatable<{ schema: T }, typeof(mt)> --& (data: any) -> (boolean, string?)
+type Form<T> = setmetatable<{ schema: T }, typeof(mt)>
 type Schema = { [string]: Check | Form<any> }
 
 local function createCheckByType(typeName: string): Check
@@ -133,13 +161,15 @@ local function createCheckByType(typeName: string): Check
 	end
 end
 
+function serdeform.create<T>(schema: T): Form<T>
+	return setmetatable({
+		schema = schema,
+	}, mt)
+end
+
 serdeform.number = createCheckByType("number") :: Check<number>
 serdeform.string = createCheckByType("string") :: Check<string>
 serdeform.boolean = createCheckByType("boolean") :: Check<boolean>
 serdeform.table = createCheckByType("table") :: Check<{}>
 
-return setmetatable(serdeform, {
-	__call = function<T>(_self, schema: T): Form<T>
-		return createForm(schema)
-	end,
-})
+return table.freeze(serdeform)
