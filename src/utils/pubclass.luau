@@ -103,9 +103,7 @@ type function ExportClassTypeFn(classIdKey: type, rootClass: type): type
 	return publicType
 end
 
-type function WithClassIdTypeFn(classIdKey: type, tbl: type): type
-	assert(classIdKey:is("singleton"), "ClassIdKey must be a valid singleton")
-	assert(tbl:is("table"), "WithClassId can only be applied to table types")
+type function UUID(): type
 	local function uuid(): string
 		local template = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"
 		local s = string.gsub(template, "[xy]", function(c)
@@ -114,7 +112,13 @@ type function WithClassIdTypeFn(classIdKey: type, tbl: type): type
 		end)
 		return s
 	end
-	tbl:setreadproperty(classIdKey, types.singleton(uuid()))
+	return types.singleton(uuid())
+end
+
+type function WithClassIdTypeFn(classIdKey: type, tbl: type): type
+	assert(classIdKey:is("singleton"), "ClassIdKey must be a valid singleton")
+	assert(tbl:is("table"), "WithClassId can only be applied to table types")
+	tbl:setreadproperty(classIdKey, UUID())
 	return tbl
 end
 
@@ -217,7 +221,14 @@ type function ExportInstanceTypeFn(classIdKey: type, rootClass: type): type
 	return instanceType
 end
 
-type DefaultClassIdKey = "__do_not_use_this_field_ClassId"
+type function PrivateKey(s: type): type
+	assert(s:is("singleton"), "PrivateKey can only be created from singleton types")
+	local keyStr = s:value()
+	assert(type(keyStr) == "string", "PrivateKey can only be created from string singletons")
+	return types.singleton("_" .. keyStr)
+end
+
+type DefaultClassIdKey = PrivateKey<UUID<>>
 export type PublicClass<T> = ExportClassTypeFn<DefaultClassIdKey, T>
 export type PublicInstance<T> = ExportInstanceTypeFn<DefaultClassIdKey, T>
 export type WithClassId<T> = WithClassIdTypeFn<DefaultClassIdKey, T>
