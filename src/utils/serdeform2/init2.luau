@@ -108,6 +108,21 @@ type Dog = setmetatable<{ name: string }, typeof(DogMt)>
 
 ]=]
 
+--[=[
+
+
+local Dog = {}
+local DogMt = { __index = Dog }
+
+function Dog.new(name: string)
+	return setmetatable({ name = name }, DogMt)
+end
+
+type Dog = setmetatable<{ name: string }, typeof(DogMt)>
+
+
+]=]
+
 function NumberType.parse(self: typeof(NumberType), input: unknown): result.Result<number>
 	if type(input) == "number" then
 		return result.success(input)
