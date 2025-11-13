@@ -29,6 +29,9 @@ end
 
 function convertCase.toCamel(variableName: string): string
 	local words = getWords(variableName)
+	if #words == 0 then
+		return variableName
+	end
 	local newVariableName = string.lower(words[1])
 
 	for index = 2, #words do
@@ -40,6 +43,9 @@ end
 
 function convertCase.toPascal(variableName: string): string
 	local words = getWords(variableName)
+	if #words == 0 then
+		return variableName
+	end
 	local newVariableName = ""
 
 	for index = 1, #words do
@@ -51,6 +57,9 @@ end
 
 function convertCase.toSnake(variableName: string): string
 	local words = getWords(variableName)
+	if #words == 0 then
+		return variableName
+	end
 	local newVariableName = string.lower(words[1])
 
 	for index = 2, #words do
@@ -62,6 +71,9 @@ end
 
 function convertCase.toUpperSnake(variableName: string): string
 	local words = getWords(variableName)
+	if #words == 0 then
+		return variableName
+	end
 	local newVariableName = words[1]
 
 	for index = 2, #words do
@@ -73,6 +85,9 @@ end
 
 function convertCase.toKebab(variableName: string): string
 	local words = getWords(variableName)
+	if #words == 0 then
+		return variableName
+	end
 	local newVariableName = string.lower(words[1])
 
 	for index = 2, #words do
@@ -84,6 +99,9 @@ end
 
 function convertCase.toLower(variableName: string): string
 	local words = getWords(variableName)
+	if #words == 0 then
+		return variableName
+	end
 	local newVariableName = string.lower(words[1])
 
 	for index = 2, #words do

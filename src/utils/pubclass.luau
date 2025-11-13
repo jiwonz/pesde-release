@@ -7,7 +7,6 @@ type function ExportClassTypeFn(classIdKey: type, rootClass: type): type
 	local hasClassId = rootClass:readproperty(classIdKey)
 	assert(hasClassId, "missing ClassId field")
 
-	-- selene: allow(shadowing)
 	local mt = rootClass:metatable()
 	assert(mt, "class must have a metatable")
 
@@ -36,30 +35,37 @@ type function ExportClassTypeFn(classIdKey: type, rootClass: type): type
 	assert(indexTbl and indexTbl:is("table"), "metatable must have __index table")
 
 	local publicMethods: { [type]: { read: type?, write: type? } } = {}
+	local publicInstanceMethods: { [type]: { read: type?, write: type? } } = {}
 	for prop, val in indexTbl:properties() do
+		-- selene: allow(shadowing)
+		local val = val.read or val.write
+		assert(val, "method value must be valid")
 		if prop:is("singleton") then
 			local propName = prop:value()
 			if type(propName) == "string" and propName:sub(1, 1) ~= "_" then
 				-- Process method to replace parameter and return types
-				local funcVal = val.read or val.write
-				if funcVal and funcVal:is("function") then
+				if val and val:is("function") then
 					-- Replace parameter types (especially self parameter)
-					local params = funcVal:parameters()
+					local params = val:parameters()
 					if params.head then
 						local newParams = {}
+						local firstParam = params.head[1]
+						if firstParam and firstParam:is("table") and firstParam:readproperty(classIdKey) then
+							publicInstanceMethods[prop] = { read = val }
+						end
 						for i, paramType in params.head do
 							-- If parameter is the original class type, replace with public type
 							if paramType:is("table") and paramType:readproperty(classIdKey) then
-								newParams[i] = publicType
+								newParams[i] = instanceType
 							else
 								newParams[i] = paramType
 							end
 						end
-						funcVal:setparameters(newParams, params.tail)
+						val:setparameters(newParams, params.tail)
 					end
 
 					-- Replace return types
-					local returns = funcVal:returns()
+					local returns = val:returns()
 					if returns.head then
 						local newReturns = {}
 						for i, returnType in returns.head do
@@ -70,13 +76,13 @@ type function ExportClassTypeFn(classIdKey: type, rootClass: type): type
 								newReturns[i] = returnType
 							end
 						end
-						funcVal:setreturns(newReturns, returns.tail)
+						val:setreturns(newReturns, returns.tail)
 					end
 				end
-				publicMethods[prop] = val
+				publicMethods[prop] = { read = val }
 			end
 		else
-			publicMethods[prop] = val
+			publicMethods[prop] = { read = val }
 		end
 	end
 
@@ -94,10 +100,23 @@ type function ExportClassTypeFn(classIdKey: type, rootClass: type): type
 	end
 	local newMt = types.newtable(newMtProps :: any, nil, nil)
 
+	-- Create new __index table with only public methods for instance
+	local newInstanceIndexTbl = types.newtable(publicInstanceMethods :: any, nil, nil)
+
+	-- Create new metatable with the new __index for instance
+	local newInstanceMtProps: { [type]: any } = {}
+	for prop, val in mt:properties() do
+		if prop:is("singleton") and prop:value() == "__index" then
+			newInstanceMtProps[prop] = { read = newInstanceIndexTbl }
+		else
+			newInstanceMtProps[prop] = val
+		end
+	end
+	local newInstanceMt = types.newtable(newInstanceMtProps :: any, nil, nil)
+
 	-- Set metatable for both types
 	publicType:setmetatable(newMt)
-	instanceType:setmetatable(newMt)
-
+	instanceType:setmetatable(newInstanceMt)
 	-- publicType is the class type (no fields)
 	-- methods will return instanceType (with public fields)
 	return publicType
@@ -131,7 +150,6 @@ type function ExportInstanceTypeFn(classIdKey: type, rootClass: type): type
 	local hasClassId = rootClass:readproperty(classIdKey)
 	assert(hasClassId, "missing ClassId field")
 
-	-- selene: allow(shadowing)
 	local mt = rootClass:metatable()
 	assert(mt, "class must have a metatable")
 
@@ -157,17 +175,24 @@ type function ExportInstanceTypeFn(classIdKey: type, rootClass: type): type
 	assert(indexTbl and indexTbl:is("table"), "metatable must have __index table")
 
 	local publicMethods: { [type]: { read: type?, write: type? } } = {}
+	local publicInstanceMethods: { [type]: { read: type?, write: type? } } = {}
 	for prop, val in indexTbl:properties() do
+		-- selene: allow(shadowing)
+		local val = val.read or val.write
+		assert(val, "method value must be valid")
 		if prop:is("singleton") then
 			local propName = prop:value()
 			if type(propName) == "string" and propName:sub(1, 1) ~= "_" then
 				-- Process method to replace parameter and return types
-				local funcVal = val.read or val.write
-				if funcVal and funcVal:is("function") then
+				if val and val:is("function") then
 					-- Replace parameter types (especially self parameter)
-					local params = funcVal:parameters()
+					local params = val:parameters()
 					if params.head then
 						local newParams = {}
+						local firstParam = params.head[1]
+						if firstParam and firstParam:is("table") and firstParam:readproperty(classIdKey) then
+							publicInstanceMethods[prop] = { read = val }
+						end
 						for i, paramType in params.head do
 							-- If parameter is the original class type, replace with instance type
 							if paramType:is("table") and paramType:readproperty(classIdKey) then
@@ -176,11 +201,11 @@ type function ExportInstanceTypeFn(classIdKey: type, rootClass: type): type
 								newParams[i] = paramType
 							end
 						end
-						funcVal:setparameters(newParams, params.tail)
+						val:setparameters(newParams, params.tail)
 					end
 
 					-- Replace return types
-					local returns = funcVal:returns()
+					local returns = val:returns()
 					if returns.head then
 						local newReturns = {}
 						for i, returnType in returns.head do
@@ -191,32 +216,32 @@ type function ExportInstanceTypeFn(classIdKey: type, rootClass: type): type
 								newReturns[i] = returnType
 							end
 						end
-						funcVal:setreturns(newReturns, returns.tail)
+						val:setreturns(newReturns, returns.tail)
 					end
 				end
-				publicMethods[prop] = val
+				publicMethods[prop] = { read = val }
 			end
 		else
-			publicMethods[prop] = val
+			publicMethods[prop] = { read = val }
 		end
 	end
 
-	-- Create new __index table with only public methods
-	local newIndexTbl = types.newtable(publicMethods :: any, nil, nil)
+	-- Create new __index table with only public methods for instance
+	local newInstanceIndexTbl = types.newtable(publicInstanceMethods :: any, nil, nil)
 
-	-- Create new metatable with the new __index
-	local newMtProps: { [type]: any } = {}
+	-- Create new metatable with the new __index for instance
+	local newInstanceMtProps: { [type]: any } = {}
 	for prop, val in mt:properties() do
 		if prop:is("singleton") and prop:value() == "__index" then
-			newMtProps[prop] = { read = newIndexTbl }
+			newInstanceMtProps[prop] = { read = newInstanceIndexTbl }
 		else
-			newMtProps[prop] = val
+			newInstanceMtProps[prop] = val
 		end
 	end
-	local newMt = types.newtable(newMtProps :: any, nil, nil)
+	local newInstanceMt = types.newtable(newInstanceMtProps :: any, nil, nil)
 
 	-- Set metatable for instance type
-	instanceType:setmetatable(newMt)
+	instanceType:setmetatable(newInstanceMt)
 
 	return instanceType
 end
