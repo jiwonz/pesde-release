@@ -75,11 +75,19 @@ function Result.unwrapOrError<T>(self: Result<T>, errorMsg: Reason?): T
 end
 
 --- Unwraps the error or errors if the result is ok
-function Result.unwrapErr(self: Result<any>): Error
+function Result.unwrapErr<T>(self: Result<T>): Error
 	if self.err then
 		return self.err
 	end
 	error("called 'Result.unwrapErr' on ok result")
+end
+
+function Result.toAssertion<T>(self: Result<T>): (boolean, string?)
+	if self.value then
+		return true, nil
+	else
+		return false, self.err:toString()
+	end
 end
 
 --- Result Class
