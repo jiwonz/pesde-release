@@ -1,15 +1,16 @@
 local pp = require("../pp")
-local types = require("./types")
+local commonTypes = require("./commonTypes")
 
-type Reason = types.Reason
+type Reason = commonTypes.Reason
 
 local Error = {}
-local ErrorMetatable = table.freeze({
+local ErrorMetatable = {
 	__index = Error,
 	__tostring = function(self: Error): string
 		return self:toString()
 	end
-})
+}
+table.freeze(ErrorMetatable)
 
 export type Error = setmetatable<{
 	read reason: Reason,

@@ -1,11 +1,12 @@
 local Error = require("@self/Error")
-local types = require("@self/types")
+local commonTypes = require("@self/commonTypes")
 
 export type Error = Error.Error
-type Reason = types.Reason
+export type Reason = commonTypes.Reason
 
 local Result = {}
-local ResultMetatable = table.freeze({ __index = Result })
+local ResultMetatable = { __index = Result }
+table.freeze(ResultMetatable)
 
 type Ok<T> = setmetatable<{
 	read isOk: true,
