@@ -5,11 +5,23 @@ local schemas = {}
 
 -- #region BaseSchema
 
--- TODO: WIP! idk with this structure. needs to think about it more. or maybe do like zod's issues method
-type SchemaError = {
-	read parse: string,
-	read required: string,
-}
+-- TODO: WIP. Make SchemaError class and maybe rename PointerSchema to something else.
+type SchemaErrorItem<T, E = {}> = {
+	read msgType: T,
+	read message: string?,
+} & typeforge.ReadOnly<E>
+type SchemaError = SchemaErrorItem<"invalidType", {
+	expected: string,
+	actual: string,
+}> | SchemaErrorItem<"custom", {}> | SchemaErrorItem<"tooSmall", {
+	minimum: number,
+	inclusive: boolean,
+	actual: number,
+}> | SchemaErrorItem<"tooBig", {
+	maximum: number,
+	inclusive: boolean,
+	actual: number,
+}>
 
 type BaseSchemaFields<I, O, D> = {
 	read ["_$sj"]: {
@@ -33,7 +45,7 @@ type OptionalDef<T> = Partial<PublicOnly<Def<T>>>?
 type OptionalDefWithout<T, K...> = Without<Partial<PublicOnly<Def<T>>>, K...>?
 type ReadWrite<T> = typeforge.ReadWrite<T>
 type OptionalDefDefinition<T, D> = ReadWrite<Partial<NonNullable<index<Def<T>, D>>>>
-type Result<T> = Result.Result<T>
+type Result<T> = Result.Result<T, SchemaError>
 
 local function withDefaultBaseSchemaFields<T>(def: T, schemaError: SchemaError): {
 	["_$sj"]: {
@@ -57,6 +69,7 @@ type BaseImpl<T> = {
 	refine: (self: T, func: (input: Input<T>) -> boolean) -> T,
 	transform: (self: T, func: (input: Input<T>) -> Infer<T>) -> T,
 	preprocess: (self: T, func: (input: unknown) -> Input<T>) -> T,
+	messages: (self: T, messages: Partial<SchemaError>) -> T,
 }
 
 local defaultBaseImpl = {} :: BaseImpl<DefaultSchema>
@@ -83,6 +96,10 @@ function defaultBaseImpl.preprocess(self, func)
 	error("Not implemented yet")
 end
 
+function defaultBaseImpl.messages(self, messages)
+	error("Not implemented yet")
+end
+
 table.freeze(defaultBaseImpl)
 
 -- #endregion
@@ -105,13 +122,14 @@ type NumberSchema<I = number> = setmetatable<
 			maxMessage: string?,
 			maxInclusive: boolean,
 		}>?,
-		allowNaN: boolean,
+		nan: boolean,
 	}>>,
 	typeof(NumberSchemaMetatable)
 >
 
 function NumberSchema.parse(self: NumberSchema, input: unknown): Result<number>
 	error("Not implemented yet")
+	-- error e.g. Result.err({ msgType = "expected_number", actual = typeof(input) })
 end
 
 do
@@ -125,7 +143,7 @@ do
 			_coerce = false,
 			int = def and def.int or false,
 			range = def and def.range or nil,
-			allowNaN = def and def.allowNaN or false,
+			nan = def and def.nan or false,
 		}), NumberSchemaMetatable)
 		table.freeze(new)
 		if internable then
@@ -171,7 +189,7 @@ do
 			_coerce = false,
 			int = true,
 			range = def and def.range or nil,
-			allowNaN = def and def.allowNaN or false,
+			nan = def and def.nan or false,
 		}), NumberSchemaMetatable)
 		table.freeze(new)
 		if internable then
@@ -201,9 +219,9 @@ function NumberSchema.coerce(self: NumberSchema): NumberSchema<unknown>
 	return schemas.number(newDef)
 end
 
-function NumberSchema.allowNaN(self: NumberSchema): NumberSchema
+function NumberSchema.nan(self: NumberSchema): NumberSchema
 	local newDef = util.copyUnfrozen(self.def)
-	newDef.allowNaN = true
+	newDef.nan = true
 	return schemas.number(newDef)
 end
 
