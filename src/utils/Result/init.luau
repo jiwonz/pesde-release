@@ -14,13 +14,13 @@ type Ok<T> = setmetatable<{
 	read value: T,
 	read err: nil,
 }, typeof(ResultMetatable)>
-type Err = setmetatable<{
+type Err<E> = setmetatable<{
 	read isOk: false,
 	read isErr: true,
 	read value: nil,
-	read err: Error,
+	read err: E,
 }, typeof(ResultMetatable)>
-export type Result<T> = Ok<T> | Err
+export type Result<T, E = Error> = Ok<T> | Err<E>
 
 --- Constructs an Ok result
 local function constructOkResult<T>(value: T): Ok<T>
@@ -33,7 +33,7 @@ local function constructOkResult<T>(value: T): Ok<T>
 end
 
 --- Constructs an Err result
-local function constructErrResult(reason: Reason | Error): Err
+local function constructErrResult<E>(reason: Reason | Error): Err<E>
 	local fail = if Error.is(reason) then reason :: Error else Error.new(reason)
 
 	return setmetatable({
@@ -45,7 +45,7 @@ local function constructErrResult(reason: Reason | Error): Err
 end
 
 --- Constructs a Result from a function that may error
-local function constructResultFromTry<T>(fn: () -> T): Result<T>
+local function constructResultFromTry<T, E>(fn: () -> T): Result<T, E>
 	local ok, err = pcall(fn)
 	if err then
 		return constructErrResult(err)
@@ -54,14 +54,14 @@ local function constructResultFromTry<T>(fn: () -> T): Result<T>
 end
 
 --- Adds context to an Err result
-Result.context = function(self: Result<any>, context: Reason): Result<any>
+Result.context = function(self: Result<any, any>, context: Reason): Result<any, any>
 	if self.err then
 		return constructErrResult(Error.new(context, self.err))
 	end
 	return self
 end :: (<T>(self: Ok<T>, context: Reason) -> Ok<T>)
-& ((self: Err, context: Reason) -> Err)
-& (<T>(self: Ok<T> | Err, context: Reason) -> Ok<T> | Err)
+& (<E>(self: Err<E>, context: Reason) -> Err<E>)
+& (<T, E>(self: Ok<T> | Err<E>, context: Reason) -> Ok<T> | Err<E>)
 
 --- Unwraps the value or errors with optional message
 function Result.unwrapOrError<T>(self: Result<T>, errorMsg: Reason?): T
