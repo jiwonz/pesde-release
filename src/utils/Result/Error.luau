@@ -1,4 +1,4 @@
-local pp = require("../pp")
+local todebugstring = require("../todebugstring")
 local commonTypes = require("./commonTypes")
 
 type Reason = commonTypes.Reason
@@ -43,15 +43,15 @@ end
 --- Converts the Error to a string representation
 function Error.toString(self: Error): string
 	if not self.source then
-		return pp(self.reason)
+		return todebugstring(self.reason)
 	end
-	return `{pp(self:rootCause().reason)}: {pp(self.reason)}`
+	return `{todebugstring(self:rootCause().reason)}: {todebugstring(self.reason)}`
 end
 
 --- Converts the Error to a detailed debug string representation
 function Error.toDebugString(self: Error): string
 	local lines: { string } = {}
-	table.insert(lines, "Error: " .. pp(self:rootCause().reason))
+	table.insert(lines, "Error: " .. todebugstring(self:rootCause().reason))
 
 	if not self.source then
 		return lines[1]
@@ -64,7 +64,7 @@ function Error.toDebugString(self: Error): string
 	-- Collect contexts from self to root (excluding root)
 	local contexts: { string } = {}
 	while current and current ~= root do
-		table.insert(contexts, pp(current.reason))
+		table.insert(contexts, todebugstring(current.reason))
 		current = current.source
 	end
 
