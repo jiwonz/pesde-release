@@ -23,7 +23,7 @@ type SchemaError = SchemaErrorItem<"invalidType", {
 	actual: number,
 }>
 
-type BaseSchemaFields<I, O, D> = {
+type BaseSchemaFields<O, D, I = O> = {
 	read ["_$sj"]: {
 		read input: I,
 		read output: O,
@@ -74,7 +74,7 @@ type BaseImpl<T> = {
 
 local defaultBaseImpl = {} :: BaseImpl<DefaultSchema>
 
-type DefaultSchema = setmetatable<BaseSchemaFields<any, any, any>, typeof(defaultBaseImpl)>
+type DefaultSchema = setmetatable<BaseSchemaFields<any, any>, typeof(defaultBaseImpl)>
 
 function defaultBaseImpl.optional(self)
 	return schemas.optional(self)
@@ -111,7 +111,7 @@ local NumberSchemaMetatable = { __index = NumberSchema }
 table.freeze(NumberSchemaMetatable)
 
 type NumberSchema<I = number> = setmetatable<
-	BaseSchemaFields<I, number, ReadOnly<{
+	BaseSchemaFields<number, ReadOnly<{
 		_coerce: boolean,
 		int: boolean,
 		range: ReadOnly<{
@@ -123,7 +123,7 @@ type NumberSchema<I = number> = setmetatable<
 			maxInclusive: boolean,
 		}>?,
 		nan: boolean,
-	}>>,
+	}>, I>,
 	typeof(NumberSchemaMetatable)
 >
 
@@ -257,7 +257,7 @@ local StringSchema = {}
 local StringSchemaMetatable = { __index = StringSchema }
 table.freeze(StringSchemaMetatable)
 
-type StringSchema = setmetatable<BaseSchemaFields<string, string, {}>, typeof(StringSchemaMetatable)>
+type StringSchema = setmetatable<BaseSchemaFields<string, {}>, typeof(StringSchemaMetatable)>
 
 function schemas.string(): StringSchema
 	return setmetatable(withDefaultBaseSchemaFields({}), StringSchemaMetatable)
@@ -285,15 +285,15 @@ local OptionalSchemaMetatable = { __index = OptionalSchema }
 table.freeze(OptionalSchemaMetatable)
 
 type OptionalSchema<T> = setmetatable<
-	BaseSchemaFields<Infer<T>?, Infer<T>?, {
-		innerSchema: T,
+	BaseSchemaFields<Infer<T>?, {
+		inner: T,
 	}>,
 	typeof(OptionalSchemaMetatable)
 >
 
-function schemas.optional<T>(innerSchema: T): OptionalSchema<T>
+function schemas.optional<T>(schema: T): OptionalSchema<T>
 	return setmetatable(withDefaultBaseSchemaFields({
-		innerSchema = innerSchema,
+		inner = schema,
 	}), OptionalSchemaMetatable)
 end
 
@@ -310,16 +310,16 @@ local PointerSchemaMetatable = { __index = PointerSchema }
 table.freeze(PointerSchemaMetatable)
 
 type PointerSchema<T> = setmetatable<
-	BaseSchemaFields<Input<T>, Infer<T>, {
-		innerSchema: T,
+	BaseSchemaFields<Input<T>, {
+		inner: T,
 		sourceKey: string,
 	}>,
 	typeof(PointerSchemaMetatable)
 >
 
-function schemas.at<T>(innerSchema: T, sourceKey: string): PointerSchema<T>
+function schemas.at<T>(schema: T, sourceKey: string): PointerSchema<T>
 	return setmetatable(withDefaultBaseSchemaFields({
-		innerSchema = innerSchema,
+		inner = schema,
 		sourceKey = sourceKey,
 	}), PointerSchemaMetatable)
 end
@@ -341,8 +341,8 @@ local SchemaEffectsMetatable = { __index = SchemaEffects }
 table.freeze(SchemaEffectsMetatable)
 
 type SchemaEffects<T> = setmetatable<
-	BaseSchemaFields<Infer<T>, Infer<T>, {
-		innerSchema: T,
+	BaseSchemaFields<Infer<T>, {
+		inner: T,
 	}>,
 	typeof(SchemaEffectsMetatable)
 >
