@@ -34,13 +34,13 @@ end
 
 --- Constructs an Err result
 local function constructErrResult<E>(reason: Reason | Error): Err<E>
-	local fail = if Error.is(reason) then reason :: Error else Error.new(reason)
+	local err = if Error.is(reason) then reason :: Error else Error.new(reason)
 
 	return setmetatable({
 		isOk = false :: false,
 		isErr = true :: true,
 		value = nil,
-		err = fail,
+		err = err,
 	}, ResultMetatable)
 end
 
