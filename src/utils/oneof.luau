@@ -55,6 +55,8 @@ export type function Variant(tag: type, value: type): type
 	return types.newtable(props)
 end
 
+export type TagOf<T> = index<T, "tag">
+
 type function Not(t: type): type
 	return types.negationof(t)
 end
