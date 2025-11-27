@@ -1,57 +1,117 @@
 export type function OneOf(variants: type): type
-	local function pushField(fieldProps: { [type]: { read: type, write: type } }, variant: type)
-		assert(variant:is("table"), "OneOf variant must be a table type")
-		local tagProp = variant:readproperty(types.singleton("tag"))
-		assert(tagProp, "OneOf variant requires 'tag' property")
-		local props: { [type]: { read: type, write: type } } = {}
-		local propCount = 0
-		for prop, val in variant:properties() do
-			if prop == types.singleton("tag") then
-				continue
+	local function collectProps(t: type, props: { [type]: { read: type, write: type } })
+		if t:is("table") then
+			for prop, val in t:properties() do
+				-- selene: allow(shadowing)
+				local val = val.read or val.write
+				assert(val, "field value must be valid")
+				props[prop] = { read = val, write = nil :: any }
 			end
-			-- selene: allow(shadowing)
-			local val = val.read or val.write
-			assert(val, "field value must be valid")
-			props[prop] = { read = val, write = nil :: any }
-			propCount += 1
+		elseif t:is("intersection") then
+			for _, component in t:components() do
+				collectProps(component, props)
+			end
 		end
+	end
+
+	local function pushField(fieldProps: { [type]: { read: type, write: type } }, variant: type)
+		-- assert(variant:is("table"), "OneOf variant must be a table type")
+		local props: { [type]: { read: type, write: type } } = {}
+		collectProps(variant, props)
+
+		local tagType = types.singleton("tag")
+		local tagProp = variant:readproperty(tagType)
+		assert(tagProp, "OneOf variant requires 'tag' property")
+
+		local tagKey: type?
+		for key, _ in props do
+			if key == types.singleton("tag") then -- 동등성 비교로 찾음
+				tagKey = key
+				break
+			end
+		end
+		if tagKey then
+			props[tagKey] = nil
+		end
+
 		local inputVariant = types.newtable(props)
-		if propCount == 1 then
+		local propCount = 0
+		local hasValue = false
+		-- inputVariant를 순회하며 정확한 키 개수 확인
+		for k, _ in inputVariant:properties() do
+			propCount += 1
+			if k == types.singleton("value") then
+				hasValue = true
+			end
+		end
+
+		-- 언래핑 로직
+		if propCount == 1 and hasValue then
 			local valueProp = inputVariant:readproperty(types.singleton("value"))
 			if valueProp then
 				inputVariant = valueProp
 			end
 		end
-		fieldProps[tagProp] =
-			{ read = types.newfunction({ head = { inputVariant } }, { head = { variant } }), write = nil :: any }
+		-- [수정] returnType 대신 variant(원본)를 그대로 사용
+		fieldProps[tagProp] = {
+			read = types.newfunction({ head = { inputVariant } }, { head = { variant } }),
+			write = nil :: any,
+		}
 	end
 	local fieldProps: { [type]: { read: type, write: type } } = {}
 	if variants:is("union") then
 		for _, variant in variants:components() do
+			-- [수정] 교차 타입인지 확인하는 분기 제거 -> 그냥 pushField로 넘김
+			-- pushField 내부의 collectProps가 알아서 처리함
 			pushField(fieldProps, variant)
 		end
-	elseif variants:is("table") then
+	elseif variants:is("table") or variants:is("intersection") then
 		pushField(fieldProps, variants)
 	else
-		error("OneOf requires a union or table type")
+		error("OneOf requires a union, table, or intersection type")
 	end
 	return types.newtable(fieldProps)
 end
 
 export type function Variant(tag: type, value: type): type
+	local function collectProps(t: type, props: { [type]: { read: type, write: type } })
+		if t:is("table") then
+			for prop, val in t:properties() do
+				-- selene: allow(shadowing)
+				local val = val.read or val.write
+				assert(val, "field value must be valid")
+				props[prop] = { read = val, write = nil :: any }
+			end
+		elseif t:is("intersection") then
+			for _, component in t:components() do
+				collectProps(component, props)
+			end
+		end
+	end
+
 	local props: { [type]: { read: type, write: type } } = {
 		[types.singleton("tag")] = { read = tag, write = nil :: any },
 	}
-	if value:is("table") and not value:readproperty(types.singleton("tag")) then
-		for prop, val in value:properties() do
-			-- selene: allow(shadowing)
-			local val = val.read or val.write
-			assert(val, "field value must be valid")
-			props[prop] = { read = val, write = nil :: any }
+
+	local function hasTag(t: type): boolean
+		if t:is("table") then
+			return t:readproperty(types.singleton("tag")) ~= nil
+		elseif t:is("intersection") then
+			for _, c in t:components() do
+				if hasTag(c) then
+					return true
+				end
+			end
 		end
+		return false
+	end
+
+	if (value:is("table") or value:is("intersection")) and not hasTag(value) then
+		collectProps(value, props) -- 안전하게 합치기
 	else
 		props[types.singleton("value")] = { read = value, write = nil :: any }
 	end
+
 	return types.newtable(props)
 end
 
