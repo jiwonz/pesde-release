@@ -37,6 +37,34 @@ end
 
 local util = {}
 
-util.copyUnfrozen = table.clone :: <T>(tbl: T) -> typeforge.ReadWrite<T>
+util.mutCopy = table.clone :: <T>(tbl: T) -> typeforge.ReadWrite<T>
+
+type function MergeTable(pack: type): type
+	assert(pack:is("function"), "must be a function with a type pack parameter type")
+	local headParam = pack:parameters().head
+	assert(headParam and #headParam > 0, "requires valid types more than one")
+	local result = headParam[1]
+	for i = 2, #headParam do
+		local t = headParam[i]
+		assert(t:is("table"), "types must be tables")
+		for prop, val in t:properties() do
+			-- selene: allow(shadowing)
+			local val = val.read or val.write
+			assert(val, "field value must be valid")
+			result:setproperty(prop, val)
+		end
+	end
+	return result
+end
+
+function util.mergeTable<Target, Other>(target: Target, ...: Other): MergeTable<(Target, ...Other) -> ()>
+	local tbl = table.clone(target)
+	for _, src in { ... } do
+		for k, v in src :: { [unknown]: unknown } do
+			(tbl :: { [unknown]: unknown })[k] = v
+		end
+	end
+	return tbl
+end
 
 return util
