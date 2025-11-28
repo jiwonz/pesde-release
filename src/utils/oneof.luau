@@ -15,7 +15,6 @@ export type function OneOf(variants: type): type
 	end
 
 	local function pushField(fieldProps: { [type]: { read: type, write: type } }, variant: type)
-		-- assert(variant:is("table"), "OneOf variant must be a table type")
 		local props: { [type]: { read: type, write: type } } = {}
 		collectProps(variant, props)
 
@@ -25,7 +24,7 @@ export type function OneOf(variants: type): type
 
 		local tagKey: type?
 		for key, _ in props do
-			if key == types.singleton("tag") then -- 동등성 비교로 찾음
+			if key == types.singleton("tag") then
 				tagKey = key
 				break
 			end
@@ -37,7 +36,6 @@ export type function OneOf(variants: type): type
 		local inputVariant = types.newtable(props)
 		local propCount = 0
 		local hasValue = false
-		-- inputVariant를 순회하며 정확한 키 개수 확인
 		for k, _ in inputVariant:properties() do
 			propCount += 1
 			if k == types.singleton("value") then
@@ -45,14 +43,12 @@ export type function OneOf(variants: type): type
 			end
 		end
 
-		-- 언래핑 로직
 		if propCount == 1 and hasValue then
 			local valueProp = inputVariant:readproperty(types.singleton("value"))
 			if valueProp then
 				inputVariant = valueProp
 			end
 		end
-		-- [수정] returnType 대신 variant(원본)를 그대로 사용
 		fieldProps[tagProp] = {
 			read = types.newfunction({ head = { inputVariant } }, { head = { variant } }),
 			write = nil :: any,
@@ -61,8 +57,6 @@ export type function OneOf(variants: type): type
 	local fieldProps: { [type]: { read: type, write: type } } = {}
 	if variants:is("union") then
 		for _, variant in variants:components() do
-			-- [수정] 교차 타입인지 확인하는 분기 제거 -> 그냥 pushField로 넘김
-			-- pushField 내부의 collectProps가 알아서 처리함
 			pushField(fieldProps, variant)
 		end
 	elseif variants:is("table") or variants:is("intersection") then
@@ -107,7 +101,7 @@ export type function Variant(tag: type, value: type): type
 	end
 
 	if (value:is("table") or value:is("intersection")) and not hasTag(value) then
-		collectProps(value, props) -- 안전하게 합치기
+		collectProps(value, props)
 	else
 		props[types.singleton("value")] = { read = value, write = nil :: any }
 	end
@@ -151,16 +145,24 @@ local function createOneOfMetatable(metatable: { [any]: any }?)
 	return OneOfMetatable
 end
 
-type OneOfInstance = setmetatable<{ [string]: Constructor }, typeof(createOneOfMetatable(nil))>
+type OneOfInstance = setmetatable<{ [string]: Constructor }, typeof(createOneOfMetatable())>
 
-local singletonInstance: OneOfInstance?
-return function(
-		metatable: {
-			[any]: any,
-		}?
-	): {
+do
+	local singletonInstance: OneOfInstance?
+	--[=[
+		Creates a variant builder.
+		- If called without arguments, returns a singleton instance.
+		- If called with a metatable, returns a new variant builder with that metatable.
+
+		@param metatable -- Metatable to set on created variants.
+		@return OneOf -- A variant builder
+	]=]
+	local function oneof(metatable: {
+		[any]: any,
+	}?): {
 		[string]: <T>(T) -> Variant<string, T>,
-	} -- in the future: oneof<<T>>()
+	} -- in the future: <T, MT>(metatable: MT?) -> OneOf<T, MT> so it would allow usage with oneof<<Variants>>() and oneof<<Class>>(metatable)
+		-- ^actually im waiting a bug fix for explicit type instantiation before doing that
 		local isSingleton = metatable == nil
 		if isSingleton and singletonInstance then
 			return singletonInstance :: any
@@ -170,4 +172,7 @@ return function(
 			singletonInstance = new :: OneOfInstance
 		end
 		return new :: any
-	end :: (() -> { [string]: <T>(T) -> Variant<string, T> }) & (<MT>(metatable: MT) -> { [string]: <T>(T) -> setmetatable<Variant<string, T>, MT> })
+	end
+
+	return oneof :: (() -> { [string]: <T>(T) -> Variant<string, T> }) & (<MT>(metatable: MT) -> { [string]: <T>(T) -> setmetatable<Variant<string, T>, MT> })
+end
