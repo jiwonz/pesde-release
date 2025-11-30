@@ -3,7 +3,6 @@ local oneof = require("../oneof")
 local typeforge = require("../typeforge")
 local util = require("./util")
 
--- TODO: is it necessary? should we move and expose them in init.luau?
 local schemas = {}
 
 type Infer<T> = index<index<T, "_$sj">, "output">
@@ -16,25 +15,25 @@ type NonNullable<T> = util.NonNullable<T>
 type PublicOnly<T> = util.PublicOnly<T>
 type OptionalDef<T> = Partial<PublicOnly<Def<T>>>?
 type OptionalDefWithout<T, K...> = Without<Partial<PublicOnly<Def<T>>>, K...>?
-type ReadWrite<T> = typeforge.ReadWrite<T>
-type OptionalDefDefinition<T, D> = ReadWrite<Partial<NonNullable<index<Def<T>, D>>>>
+type OptionalDefDefinition<T, D> = Partial<NonNullable<index<Def<T>, D>>>
 type Result<T> = Result.Result<T, SchemaError>
 
 -- #region SchemaError
 type SchemaError =
 	| oneof.Variant<"invalidType", { expected: string, actual: string }>
-	| oneof.Variant<"custom", {}>
+	| oneof.Variant<"custom", { message: string }>
+local SchemaError = oneof() :: oneof.OneOf<SchemaError>
 
 -- #endregion
 
 -- #region BaseSchema
 
-type BaseSchemaFields<O, D, I = O> = {
+type BaseSchemaFields<Output, Def, Input = Output> = {
 	read ["_$sj"]: {
-		read input: I,
-		read output: O,
+		read input: Input,
+		read output: Output,
 	},
-	read def: D,
+	read def: Def,
 	read sourceKey: string?,
 	read customMessages: { [oneof.TagOf<SchemaError>]: string? }?,
 }
@@ -47,16 +46,16 @@ local function createBaseSchemaFields<T>(def: T): BaseSchemaFields<any, T>
 	}
 end
 
-type BaseImpl<T> = {
-	optional: (self: T) -> OptionalSchema<T>,
-	at: (self: T, key: string) -> AtSchema<T>,
-	refine: (self: T, func: (input: Input<T>) -> boolean) -> SchemaEffects<T>,
-	transform: (self: T, func: (input: Input<T>) -> Infer<T>) -> SchemaEffects<T>,
-	preprocess: (self: T, func: (input: unknown) -> Input<T>) -> SchemaEffects<T>,
-	messages: (self: T, newCustomMessages: index<T, "customMessages">) -> T,
+type BaseSchemaImpl<Self> = {
+	optional: (self: Self) -> OptionalSchema<Self>,
+	at: (self: Self, key: string) -> AtSchema<Self>,
+	refine: (self: Self, func: (input: Input<Self>) -> boolean) -> SchemaEffects<Self>,
+	transform: (self: Self, func: (input: Input<Self>) -> Infer<Self>) -> SchemaEffects<Self>,
+	preprocess: (self: Self, func: (input: unknown) -> Input<Self>) -> SchemaEffects<Self>,
+	messages: (self: Self, newCustomMessages: index<Self, "customMessages">) -> Self,
 }
 
-local defaultBaseImpl = {} :: BaseImpl<DefaultSchema>
+local defaultBaseImpl = {} :: BaseSchemaImpl<DefaultSchema>
 
 type DefaultSchema = setmetatable<BaseSchemaFields<any, any>, typeof(defaultBaseImpl)>
 
@@ -238,7 +237,7 @@ end
 NumberSchema.nonpositive = NumberSchema.negative
 
 do
-	local baseImpl = defaultBaseImpl :: BaseImpl<NumberSchema>
+	local baseImpl = defaultBaseImpl :: BaseSchemaImpl<NumberSchema>
 	NumberSchema.at = baseImpl.at
 	NumberSchema.refine = baseImpl.refine
 	NumberSchema.transform = baseImpl.transform
@@ -267,8 +266,12 @@ function schemas.optional<T>(schema: T): OptionalSchema<T>
 end
 
 do
-	local baseImpl = defaultBaseImpl :: BaseImpl<OptionalSchema<any>>
+	local baseImpl = defaultBaseImpl :: BaseSchemaImpl<OptionalSchema<any>>
 	OptionalSchema.optional = baseImpl.optional
+	OptionalSchema.at = baseImpl.at
+	OptionalSchema.refine = baseImpl.refine
+	OptionalSchema.transform = baseImpl.transform
+	OptionalSchema.preprocess = baseImpl.preprocess
 end
 
 -- #endregion
@@ -294,7 +297,7 @@ function schemas.at<T>(schema: T, sourceKey: string): AtSchema<T>
 end
 
 do
-	local baseImpl = defaultBaseImpl :: BaseImpl<AtSchema<any>>
+	local baseImpl = defaultBaseImpl :: BaseSchemaImpl<AtSchema<any>>
 	AtSchema.optional = baseImpl.optional
 	AtSchema.at = baseImpl.at
 	AtSchema.refine = baseImpl.refine
